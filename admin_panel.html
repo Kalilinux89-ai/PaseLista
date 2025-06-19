@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Panel de Administrador</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    input, select { margin: 5px; }
+    table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+    th, td { border: 1px solid black; padding: 5px; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Administración de Usuarios</h1>
+
+  <h2>Agregar Usuario</h2>
+  <input id="nombre" placeholder="Nombre">
+  <input id="matricula" placeholder="Matrícula">
+  <input id="password" placeholder="Contraseña">
+  <select id="rol">
+    <option value="alumno">Alumno</option>
+    <option value="profesor">Profesor</option>
+    <option value="admin">Administrador</option>
+  </select>
+  <button onclick="agregarUsuario()">Agregar</button>
+
+  <h2>Usuarios Registrados</h2>
+  <table>
+    <thead>
+      <tr><th>Matrícula</th><th>Nombre</th><th>Rol</th><th>Acciones</th></tr>
+    </thead>
+    <tbody id="usuarios"></tbody>
+  </table>
+
+  <script>
+    function cargarUsuarios() {
+      fetch("http://localhost:3000/api/usuarios")
+        .then(res => res.json())
+        .then(data => {
+          const tbody = document.getElementById("usuarios");
+          tbody.innerHTML = "";
+          data.forEach(u => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${u.matricula}</td>
+              <td>${u.nombre}</td>
+              <td>${u.rol}</td>
+              <td><button onclick="eliminarUsuario('${u.matricula}')">Eliminar</button></td>
+            `;
+            tbody.appendChild(tr);
+          });
+        });
+    }
+
+    function agregarUsuario() {
+      const user = {
+        nombre: document.getElementById("nombre").value,
+        matricula: document.getElementById("matricula").value,
+        password: document.getElementById("password").value,
+        rol: document.getElementById("rol").value
+      };
+
+      fetch("http://localhost:3000/api/usuarios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(user)
+      })
+      .then(res => res.json())
+      .then(() => {
+        cargarUsuarios();
+        document.getElementById("nombre").value = "";
+        document.getElementById("matricula").value = "";
+        document.getElementById("password").value = "";
+      });
+    }
+
+    function eliminarUsuario(matricula) {
+      fetch(`http://localhost:3000/api/usuarios/${matricula}`, {
+        method: "DELETE"
+      })
+      .then(() => cargarUsuarios());
+    }
+
+    cargarUsuarios();
+  </script>
+</body>
+</html>

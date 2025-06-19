@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Tomar Pase</title>
+  <link rel="stylesheet" href="css/proflista.css">
+  <style>
+    /* Agrego estilo para el selector */
+    #selectorDia {
+      margin-bottom: 15px;
+      padding: 8px 12px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      width: 200px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h2>Pase de Lista</h2>
+
+    <!-- Selector de día de la semana -->
+    <label for="selectorDia">Selecciona el día para pasar lista:</label><br>
+    <select id="selectorDia"></select> <!-- Se llenará por JS -->
+
+    <table border="1" style="width:100%; margin-top: 20px;">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Matrícula</th>
+          <th>Nombre</th>
+          <th>Apellido Paterno</th>
+          <th>Apellido Materno</th>
+          <th>Correo</th>
+          <th>Asistencia</th>
+        </tr>
+      </thead>
+      <tbody id="tablaPase"></tbody>
+    </table>
+    <br>
+    <button onclick="guardarPase()">Guardar Pase</button>
+    <button onclick="generarExcel()">Generar Excel</button>
+    <a href="profesor.html"><button>Volver</button></a>
+  </div>
+
+  <script src="js/datosSimulados.js"></script>
+  <script>
+    // Horarios con días y materias
+    const horarios = [
+      { clave: "SCC-1017", nombre: "Métodos Numéricos", dia: "Lunes", inicio: "07:00", final: "09:00" },
+      { clave: "ACF-0905", nombre: "Ecuaciones Diferenciales", dia: "Lunes", inicio: "09:00", final: "12:00" },
+      { clave: "TUTORIAS", nombre: "Tutorias", dia: "Lunes", inicio: "12:00", final: "14:00" },
+      { clave: "INGLES", nombre: "INGLES", dia: "Martes", inicio: "09:00", final: "11:00" },
+      { clave: "SCD-1003", nombre: "Arquitectura de Computadoras", dia: "Martes", inicio: "11:00", final: "13:00" },
+      { clave: "SCD-1027", nombre: "Tópicos Avanzados de Programación", dia: "Martes", inicio: "13:00", final: "15:00" },
+      { clave: "AEF-1031", nombre: "Fundamentos de Base de Datos", dia: "Martes", inicio: "15:00", final: "18:00" },
+      { clave: "SCC-1017", nombre: "Métodos Numéricos", dia: "Miércoles", inicio: "07:00", final: "09:00" },
+      { clave: "INGLES", nombre: "Ingles", dia: "Miércoles", inicio: "09:00", final: "11:00" },
+      { clave: "ACF-0905", nombre: "Ecuaciones Diferenciales", dia: "Miércoles", inicio: "11:00", final: "13:00" },
+      { clave: "SCA-1026", nombre: "Taller de Sistemas Operativos", dia: "Miércoles", inicio: "13:00", final: "15:00" },
+      { clave: "INGLES", nombre: "Ingles", dia: "Jueves", inicio: "08:00", final: "09:00" },
+      { clave: "ACA-0907", nombre: "Taller de Ética", dia: "Jueves", inicio: "09:00", final: "11:00" },
+      { clave: "AEF-1031", nombre: "Fundamentos de Base de Datos", dia: "Jueves", inicio: "11:00", final: "13:00" },
+      { clave: "SCD-1027", nombre: "Tópicos Avanzados de Programación", dia: "Jueves", inicio: "14:00", final: "17:00" },
+      { clave: "SCA-1026", nombre: "Taller de Sistemas Operativos", dia: "Viernes", inicio: "07:00", final: "09:00" },
+      { clave: "ACA-0907", nombre: "Taller de Ética", dia: "Viernes", inicio: "09:00", final: "12:00" },
+      { clave: "SCD-1003", nombre: "Arquitectura de Computadoras", dia: "Viernes", inicio: "12:00", final: "15:00" }
+    ];
+
+    // Función para normalizar día a valor sin acentos y minúsculas (para el value del option)
+    function normalizarDia(dia) {
+      return dia.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }
+
+    const usuario = JSON.parse(localStorage.getItem("usuario"));
+    const materia = localStorage.getItem("materiaSeleccionada");
+    const selectorDia = document.getElementById("selectorDia");
+
+    if (!usuario || usuario.rol !== "profesor" || !materia) {
+      location.href = "login.html";
+    }
+
+    // Filtrar los días únicos para la materia seleccionada
+    const diasMateria = [...new Set(
+      horarios
+        .filter(h => h.clave === materia)
+        .map(h => h.dia)
+    )];
+
+    // Map con nombre correcto para mostrar en el select
+    const nombresDias = {
+      lunes: "Lunes",
+      martes: "Martes",
+      miercoles: "Miércoles",
+      jueves: "Jueves",
+      viernes: "Viernes",
+      sabado: "Sábado",
+      domingo: "Domingo"
+    };
+
+    // Llenar select solo con días que corresponden a la materia
+    selectorDia.innerHTML = ""; // limpiar opciones previas
+
+    if (diasMateria.length === 0) {
+      selectorDia.innerHTML = `<option value="">No hay días asignados</option>`;
+      selectorDia.disabled = true;
+    } else {
+      diasMateria.forEach(dia => {
+        const val = normalizarDia(dia);
+        const option = document.createElement("option");
+        option.value = val;
+        option.textContent = nombresDias[val] || dia;
+        selectorDia.appendChild(option);
+      });
+      selectorDia.disabled = false;
+    }
+
+    const alumnos = usuariosSimulados.filter(u => u.rol === "alumno");
+    const tbody = document.getElementById("tablaPase");
+
+    // Función para renderizar la tabla según el pase guardado para materia y día
+    function renderizarTabla() {
+      tbody.innerHTML = "";
+      const pases = JSON.parse(localStorage.getItem("pases") || "{}");
+      const diaSeleccionado = selectorDia.value;
+      const paseDia = (pases[materia] && pases[materia][diaSeleccionado]) || [];
+
+      alumnos.forEach(al => {
+        // Buscar estado guardado para este alumno en el día seleccionado
+        const registro = paseDia.find(p => p.id_usuario === al.id_usuario);
+        const estado = registro ? registro.estado : null;
+
+        const fila = document.createElement("tr");
+        fila.innerHTML = `
+          <td>${al.id_usuario}</td>
+          <td>${al.matricula}</td>
+          <td>${al.nombre}</td>
+          <td>${al.ape1}</td>
+          <td>${al.ape2 || ""}</td>
+          <td>${al.correo}</td>
+          <td>
+            <div class="asistencia-buttons" data-id="${al.id_usuario}" data-estado="${estado || ''}">
+              <button class="btn-presente ${estado === 'Presente' ? 'active' : ''}" onclick="marcarAsistencia(${al.id_usuario}, 'Presente', this)">Asistencia</button>
+              <button class="btn-retardo ${estado === 'Retardo' ? 'active' : ''}" onclick="marcarAsistencia(${al.id_usuario}, 'Retardo', this)">Retardo</button>
+              <button class="btn-falta ${(!estado || estado === 'Falta') ? 'active' : ''}" onclick="marcarAsistencia(${al.id_usuario}, 'Falta', this)">Falta</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(fila);
+      });
+    }
+
+    // Marca visual y guarda temporalmente el tipo de asistencia
+    function marcarAsistencia(id, tipo, boton) {
+      const grupoBotones = boton.parentElement;
+      grupoBotones.dataset.estado = tipo;
+
+      grupoBotones.querySelectorAll("button").forEach(btn => btn.classList.remove("active"));
+      boton.classList.add("active");
+    }
+
+    // Guarda el pase de lista en localStorage y notifica a otras pestañas
+  function guardarPase() {
+  const botones = document.querySelectorAll(".asistencia-buttons");
+  const diaSeleccionado = selectorDia.value;
+
+  let pases = JSON.parse(localStorage.getItem("pases") || "{}");
+  if (!pases[materia]) pases[materia] = {};
+
+  const paseActual = Array.from(botones).map(div => ({
+    id_usuario: parseInt(div.dataset.id),
+    estado: div.dataset.estado || "Falta"
+  }));
+
+  pases[materia][diaSeleccionado] = paseActual;
+
+  // Guarda y notifica a otras pestañas
+  localStorage.setItem("pases", JSON.stringify(pases));
+
+  mostrarMensaje(`Pase guardado correctamente para ${materia} el día ${diaSeleccionado}.`);
+  renderizarTabla();
+}
+
+
+// Función para mostrar mensaje temporal
+function mostrarMensaje(texto) {
+  let mensaje = document.getElementById("mensajeGuardar");
+  if (!mensaje) {
+    mensaje = document.createElement("div");
+    mensaje.id = "mensajeGuardar";
+    mensaje.style.position = "fixed";
+    mensaje.style.top = "20px";
+    mensaje.style.right = "20px";
+    mensaje.style.backgroundColor = "#27ae60";
+    mensaje.style.color = "white";
+    mensaje.style.padding = "10px 20px";
+    mensaje.style.borderRadius = "8px";
+    mensaje.style.boxShadow = "0 2px 10px rgba(0,0,0,0.2)";
+    mensaje.style.zIndex = "1000";
+    document.body.appendChild(mensaje);
+  }
+  mensaje.textContent = texto;
+  mensaje.style.opacity = "1";
+
+  setTimeout(() => {
+    mensaje.style.transition = "opacity 0.5s ease";
+    mensaje.style.opacity = "0";
+  }, 2500);
+}
+
+
+    function generarExcel() {
+      alert("Excel generado (simulado) para materia: " + materia);
+    }
+
+    // Cuando cambie el día, recargar tabla con datos correspondientes
+    selectorDia.addEventListener("change", renderizarTabla);
+
+    // Selecciona primer día y renderiza tabla al cargar
+    if (diasMateria.length > 0) {
+      selectorDia.value = normalizarDia(diasMateria[0]);
+    }
+    renderizarTabla();
+  </script>
+</body>
+</html>
